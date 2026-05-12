@@ -1,19 +1,76 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
     <head>
-        <title>three.js - patitos con Draco</title>
+        <title>Three.js - Simulación ITP</title>
         <meta charset=utf-8 />
         <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+        <!-- Bootstrap para el Navbar y Footer -->
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
         <link type="text/css" rel="stylesheet" href="./assets/css/main.css">
         <link rel="icon" type="image/png" href="./assets/img/favicon.png">
+        <style>
+            body { margin: 0; overflow: hidden; background-color: #000; }
+            #container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+            
+            /* Ajustes para que Three.js no tape el contenido */
+            .navbar { z-index: 10; background: rgba(33, 37, 41, 0.9) !important; }
+            .footer { 
+                position: absolute; 
+                bottom: 0; 
+                width: 100%; 
+                z-index: 10; 
+                background: rgba(33, 37, 41, 0.9); 
+                color: white;
+                padding: 10px 0;
+            }
+            #info-overlay {
+                position: absolute;
+                top: 70px;
+                left: 20px;
+                z-index: 5;
+                color: white;
+                text-shadow: 1px 1px 2px black;
+                pointer-events: none;
+            }
+        </style>
     </head>
     <body>
-        <div id="info">
-            Octree threejs demo - Lanzamiento de Patitos (Soporte Draco)<br />
-            MOUSE para mirar y lanzar patos<br/>
-            WASD para moverse y ESPACIO para saltar
+
+        <!-- NAVBAR -->
+        <nav class="navbar navbar-expand-lg navbar-dark shadow">
+            <div class="container-fluid">
+                <a class="navbar-brand" href="#">
+                    <strong>ITP</strong> | Graficación
+                </a>
+                <div class="navbar-text text-light d-none d-md-block">
+                    Simulación Física con Octree y Soporte Draco
+                </div>
+            </div>
+        </nav>
+
+        <!-- INFO SOBRE EL JUEGO -->
+        <div id="info-overlay">
+            <h5>Controles:</h5>
+            <p class="mb-0">WASD: Movimiento | ESPACIO: Saltar</p>
+            <p>Click: Lanzar Patito</p>
         </div>
+
         <div id="container"></div>
+
+        <!-- FOOTER -->
+        <footer class="footer mt-auto py-3 shadow-lg">
+            <div class="container text-center">
+                <div class="row">
+                    <div class="col-md-6 text-md-start">
+                        <span class="text-muted">2026 Simulación de Sistemas</span>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <strong>Programador:</strong> Cristopher Rodríguez Pérez 
+                        <span class="badge bg-primary ms-2">Ing. Sistemas ITP</span>
+                    </div>
+                </div>
+            </div>
+        </footer>
 
         <script type="importmap">
             {
@@ -28,7 +85,7 @@
             import * as THREE from 'three';
             import Stats from 'three/addons/libs/stats.module.js';
             import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-            import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; // Importar Draco
+            import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
             import { Octree } from 'three/addons/math/Octree.js';
             import { OctreeHelper } from 'three/addons/helpers/OctreeHelper.js';
             import { Capsule } from 'three/addons/math/Capsule.js';
@@ -76,7 +133,9 @@
 
             const stats = new Stats();
             stats.domElement.style.position = 'absolute';
-            stats.domElement.style.top = '0px';
+            stats.domElement.style.top = '70px'; // Ajustado para no chocar con el Navbar
+            stats.domElement.style.right = '20px';
+            stats.domElement.style.left = 'auto';
             container.appendChild( stats.domElement );
 
             const GRAVITY = 30;
@@ -94,10 +153,8 @@
                 const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
                 sphere.visible = false; 
                 scene.add( sphere );
-
                 const modelGroup = new THREE.Group();
                 scene.add(modelGroup);
-
                 spheres.push( {
                     mesh: sphere,
                     model: modelGroup,
@@ -144,13 +201,11 @@
 
             function throwBall() {
                 const sphere = spheres[ sphereIdx ];
-
                 if ( ballModel && sphere.model.children.length === 0 ) {
                     const clone = ballModel.clone();
-                    clone.scale.set(0.3, 0.3, 0.3); // Ajustar según el tamaño del pato
+                    clone.scale.set(0.3, 0.3, 0.3);
                     sphere.model.add( clone );
                 }
-
                 camera.getWorldDirection( playerDirection );
                 sphere.collider.center.copy( playerCollider.end ).addScaledVector( playerDirection, playerCollider.radius * 1.5 );
                 const impulse = 15 + 30 * ( 1 - Math.exp( ( mouseTime - performance.now() ) * 0.001 ) );
@@ -186,47 +241,6 @@
                 camera.position.copy( playerCollider.end );
             }
 
-            function playerSphereCollision( sphere ) {
-                const center = vector1.addVectors( playerCollider.start, playerCollider.end ).multiplyScalar( 0.5 );
-                const sphere_center = sphere.collider.center;
-                const r = playerCollider.radius + sphere.collider.radius;
-                const r2 = r * r;
-                for ( const point of [ playerCollider.start, playerCollider.end, center ] ) {
-                    const d2 = point.distanceToSquared( sphere_center );
-                    if ( d2 < r2 ) {
-                        const normal = vector1.subVectors( point, sphere_center ).normalize();
-                        const v1 = vector2.copy( normal ).multiplyScalar( normal.dot( playerVelocity ) );
-                        const v2 = vector3.copy( normal ).multiplyScalar( normal.dot( sphere.velocity ) );
-                        playerVelocity.add( v2 ).sub( v1 );
-                        sphere.velocity.add( v1 ).sub( v2 );
-                        const d = ( r - Math.sqrt( d2 ) ) / 2;
-                        sphere_center.addScaledVector( normal, - d );
-                    }
-                }
-            }
-
-            function spheresCollisions() {
-                for ( let i = 0, length = spheres.length; i < length; i ++ ) {
-                    const s1 = spheres[ i ];
-                    for ( let j = i + 1; j < length; j ++ ) {
-                        const s2 = spheres[ j ];
-                        const d2 = s1.collider.center.distanceToSquared( s2.collider.center );
-                        const r = s1.collider.radius + s2.collider.radius;
-                        const r2 = r * r;
-                        if ( d2 < r2 ) {
-                            const normal = vector1.subVectors( s1.collider.center, s2.collider.center ).normalize();
-                            const v1 = vector2.copy( normal ).multiplyScalar( normal.dot( s1.velocity ) );
-                            const v2 = vector3.copy( normal ).multiplyScalar( normal.dot( s2.velocity ) );
-                            s1.velocity.add( v2 ).sub( v1 );
-                            s2.velocity.add( v1 ).sub( v2 );
-                            const d = ( r - Math.sqrt( d2 ) ) / 2;
-                            s1.collider.center.addScaledVector( normal, d );
-                            s2.collider.center.addScaledVector( normal, - d );
-                        }
-                    }
-                }
-            }
-
             function updateSpheres( deltaTime ) {
                 spheres.forEach( sphere => {
                     sphere.collider.center.addScaledVector( sphere.velocity, deltaTime );
@@ -239,10 +253,7 @@
                     }
                     const damping = Math.exp( - 1.5 * deltaTime ) - 1;
                     sphere.velocity.addScaledVector( sphere.velocity, damping );
-                    playerSphereCollision( sphere );
                 } );
-
-                spheresCollisions();
 
                 for ( const sphere of spheres ) {
                     sphere.mesh.position.copy( sphere.collider.center );
@@ -254,6 +265,61 @@
                         }
                     }
                 }
+            }
+
+            const dracoLoader = new DRACOLoader();
+            dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/' );
+
+            const loader = new GLTFLoader().setPath( './models/gltf/' );
+            loader.setDRACOLoader( dracoLoader );
+
+            loader.load( 'collision-world.glb', ( gltf ) => {
+                scene.add( gltf.scene );
+                worldOctree.fromGraphNode( gltf.scene );
+                gltf.scene.traverse( child => {
+                    if ( child.isMesh ) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if ( child.material.map ) child.material.map.anisotropy = 4;
+                    }
+                } );
+                const helper = new OctreeHelper( worldOctree );
+                helper.visible = false;
+                scene.add( helper );
+                const gui = new GUI( { width: 200 } );
+                gui.add( { debug: false }, 'debug' ).onChange( value => { helper.visible = value; } );
+            } );
+
+            let ballModel;
+            loader.load('duck.glb', (gltf) => {
+                ballModel = gltf.scene;
+                ballModel.traverse(child => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                    }
+                });
+            });
+
+            function teleportPlayerIfOob() {
+                if ( camera.position.y <= - 25 ) {
+                    playerCollider.start.set( 0, 0.35, 0 );
+                    playerCollider.end.set( 0, 1, 0 );
+                    camera.position.copy( playerCollider.end );
+                }
+            }
+
+            function animate() {
+                timer.update();
+                const deltaTime = Math.min( 0.05, timer.getDelta() ) / STEPS_PER_FRAME;
+                for ( let i = 0; i < STEPS_PER_FRAME; i ++ ) {
+                    controls( deltaTime );
+                    updatePlayer( deltaTime );
+                    updateSpheres( deltaTime );
+                    teleportPlayerIfOob();
+                }
+                renderer.render( scene, camera );
+                stats.update();
             }
 
             function getForwardVector() {
@@ -278,72 +344,6 @@
                 if ( keyStates[ 'KeyA' ] ) playerVelocity.add( getSideVector().multiplyScalar( - speedDelta ) );
                 if ( keyStates[ 'KeyD' ] ) playerVelocity.add( getSideVector().multiplyScalar( speedDelta ) );
                 if ( playerOnFloor && keyStates[ 'Space' ] ) playerVelocity.y = 15;
-            }
-
-            // CONFIGURACIÓN DE CARGADORES
-            const dracoLoader = new DRACOLoader();
-            // Ruta a los decodificadores (Usamos los de gstatic para evitar problemas locales)
-            dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/' );
-
-            const loader = new GLTFLoader().setPath( './models/gltf/' );
-            loader.setDRACOLoader( dracoLoader ); // Vincular Draco con GLTF
-
-            // Cargar escenario
-            loader.load( 'collision-world.glb', ( gltf ) => {
-                scene.add( gltf.scene );
-                worldOctree.fromGraphNode( gltf.scene );
-                gltf.scene.traverse( child => {
-                    if ( child.isMesh ) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        if ( child.material.map ) child.material.map.anisotropy = 4;
-                    }
-                } );
-
-                const helper = new OctreeHelper( worldOctree );
-                helper.visible = false;
-                scene.add( helper );
-
-                const gui = new GUI( { width: 200 } );
-                gui.add( { debug: false }, 'debug' ).onChange( value => { helper.visible = value; } );
-            } );
-
-            // Cargar Patito con soporte Draco
-            let ballModel;
-            loader.load('duck.glb', (gltf) => {
-                ballModel = gltf.scene;
-                console.log("¡duck.glb cargado con éxito usando Draco!");
-                ballModel.traverse(child => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                    }
-                });
-            }, undefined, (error) => {
-                console.error("Error al cargar duck.glb:", error);
-            });
-
-            function teleportPlayerIfOob() {
-                if ( camera.position.y <= - 25 ) {
-                    playerCollider.start.set( 0, 0.35, 0 );
-                    playerCollider.end.set( 0, 1, 0 );
-                    playerCollider.radius = 0.35;
-                    camera.position.copy( playerCollider.end );
-                    camera.rotation.set( 0, 0, 0 );
-                }
-            }
-
-            function animate() {
-                timer.update();
-                const deltaTime = Math.min( 0.05, timer.getDelta() ) / STEPS_PER_FRAME;
-                for ( let i = 0; i < STEPS_PER_FRAME; i ++ ) {
-                    controls( deltaTime );
-                    updatePlayer( deltaTime );
-                    updateSpheres( deltaTime );
-                    teleportPlayerIfOob();
-                }
-                renderer.render( scene, camera );
-                stats.update();
             }
         </script>
     </body>
