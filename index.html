@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
-        <title>three.js - misc - octree collisions</title>
+        <title>three.js - patitos con Draco</title>
         <meta charset=utf-8 />
         <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
         <link type="text/css" rel="stylesheet" href="./assets/css/main.css">
@@ -9,8 +9,8 @@
     </head>
     <body>
         <div id="info">
-            Octree threejs demo - Colisiones con modelos 3D personalizados<br />
-            MOUSE para mirar y lanzar objetos<br/>
+            Octree threejs demo - Lanzamiento de Patitos (Soporte Draco)<br />
+            MOUSE para mirar y lanzar patos<br/>
             WASD para moverse y ESPACIO para saltar
         </div>
         <div id="container"></div>
@@ -28,6 +28,7 @@
             import * as THREE from 'three';
             import Stats from 'three/addons/libs/stats.module.js';
             import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+            import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js'; // Importar Draco
             import { Octree } from 'three/addons/math/Octree.js';
             import { OctreeHelper } from 'three/addons/helpers/OctreeHelper.js';
             import { Capsule } from 'three/addons/math/Capsule.js';
@@ -89,12 +90,9 @@
             const spheres = [];
             let sphereIdx = 0;
 
-            // 1. Inicialización de colisionadores y grupos para modelos
             for ( let i = 0; i < NUM_SPHERES; i ++ ) {
                 const sphere = new THREE.Mesh( sphereGeometry, sphereMaterial );
-                sphere.castShadow = true;
-                sphere.receiveShadow = true;
-                sphere.visible = false; // La esfera de Threejs es solo para depuración
+                sphere.visible = false; 
                 scene.add( sphere );
 
                 const modelGroup = new THREE.Group();
@@ -144,14 +142,12 @@
                 renderer.setSize( window.innerWidth, window.innerHeight );
             }
 
-            // 2. Función de lanzamiento modificada para el modelo 3D
             function throwBall() {
                 const sphere = spheres[ sphereIdx ];
 
                 if ( ballModel && sphere.model.children.length === 0 ) {
                     const clone = ballModel.clone();
-                    // Ajusta aquí la escala si el dragón se ve muy grande o pequeño
-                    clone.scale.set(1, 1, 1); 
+                    clone.scale.set(0.3, 0.3, 0.3); // Ajustar según el tamaño del pato
                     sphere.model.add( clone );
                 }
 
@@ -252,9 +248,9 @@
                     sphere.mesh.position.copy( sphere.collider.center );
                     if ( sphere.model ) {
                         sphere.model.position.copy( sphere.collider.center );
-                        if ( sphere.velocity.length() > 0.1 ) {
-                            sphere.model.rotation.y += 0.05;
-                            sphere.model.rotation.x += 0.02;
+                        if ( sphere.velocity.length() > 0.2 ) {
+                            sphere.model.rotation.x += sphere.velocity.z * 0.05;
+                            sphere.model.rotation.z -= sphere.velocity.x * 0.05;
                         }
                     }
                 }
@@ -284,10 +280,15 @@
                 if ( playerOnFloor && keyStates[ 'Space' ] ) playerVelocity.y = 15;
             }
 
-            // 3. Carga de modelos
-            const loader = new GLTFLoader().setPath( './models/gltf/' );
+            // CONFIGURACIÓN DE CARGADORES
+            const dracoLoader = new DRACOLoader();
+            // Ruta a los decodificadores (Usamos los de gstatic para evitar problemas locales)
+            dracoLoader.setDecoderPath( 'https://www.gstatic.com/draco/versioned/decoders/1.5.6/' );
 
-            // Cargar Escenario
+            const loader = new GLTFLoader().setPath( './models/gltf/' );
+            loader.setDRACOLoader( dracoLoader ); // Vincular Draco con GLTF
+
+            // Cargar escenario
             loader.load( 'collision-world.glb', ( gltf ) => {
                 scene.add( gltf.scene );
                 worldOctree.fromGraphNode( gltf.scene );
@@ -307,11 +308,11 @@
                 gui.add( { debug: false }, 'debug' ).onChange( value => { helper.visible = value; } );
             } );
 
-            // Cargar Objeto Proyectil (Dragón)
+            // Cargar Patito con soporte Draco
             let ballModel;
-            loader.load('DragonAttenuation.glb', (gltf) => {
+            loader.load('duck.glb', (gltf) => {
                 ballModel = gltf.scene;
-                console.log("Modelo DragonAttenuation.glb cargado correctamente");
+                console.log("¡duck.glb cargado con éxito usando Draco!");
                 ballModel.traverse(child => {
                     if (child.isMesh) {
                         child.castShadow = true;
@@ -319,7 +320,7 @@
                     }
                 });
             }, undefined, (error) => {
-                console.error("Error cargando el dragón. Revisa que el archivo esté en /models/gltf/DragonAttenuation.glb", error);
+                console.error("Error al cargar duck.glb:", error);
             });
 
             function teleportPlayerIfOob() {
